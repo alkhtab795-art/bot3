@@ -1,0 +1,73 @@
+import os
+import io
+import PyPDF2
+import requests
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
+# اجلب المتغيرات من البيئة
+TELEGRAM_TOKEN = os.getenv("6221975594:AAFeG3Qo6rYwiRs95BT6WSP6PXlr6BjnHDA")
+OPENAI_KEY = os.getenv("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")
+
+# رابط API الخاص بـ OpenAI
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+
+# دالة الترجمة باستخدام OpenAI
+def translate_text(text, target_lang="ar"):
+    headers = {
+        "Authorization": f"Bearer {OPENAI_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": f"ترجم النص التالي إلى {target_lang} ترجمة علمية دقيقة دون أي خطأ:"},
+            {"role": "user", "content": text}
+        ]
+    }
+    response = requests.post(OPENAI_URL, headers=headers, json=data)
+    result = response.json()
+    return result["choices"][0]["message"]["content"].strip()
+
+# عند بدء البوت
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("أرسل ملف PDF وسأعيده مترجمًا مع كل سطر وترجمته تحته.")
+
+# عند استلام PDF
+async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    file = await update.message.document.get_file()
+    file_path = await file.download_to_drive()
+    
+    # قراءة PDF واستخراج النصوص
+    pdf_reader = PyPDF2.PdfReader(open(file_path, "rb"))
+    lines = []
+    for page in pdf_reader.pages:
+        lines.extend(page.extract_text().split("\n"))
+
+    # الترجمة
+    translated_lines = [f"{line}\n{translate_text(line)}" for line in lines if line.strip()]
+
+    # إنشاء PDF جديد
+    output = io.BytesIO()
+    pdf_canvas = canvas.Canvas(output, pagesize=A4)
+    y = 800
+    for tl in translated_lines:
+        pdf_canvas.drawString(50, y, tl)
+        y -= 20
+        if y < 50:
+            pdf_canvas.showPage()
+            y = 800
+    pdf_canvas.save()
+    output.seek(0)
+
+    # إرسال PDF للمستخدم
+    await update.message.reply_document(document=output, filename="translated.pdf")
+    os.remove(file_path)
+
+# تشغيل البوت
+app = Application.builder().token(TELEGRAM_TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.Document.PDF, handle_pdf))
+app.run_polling()
