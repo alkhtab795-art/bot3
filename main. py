@@ -8,8 +8,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # اجلب المتغيرات من البيئة
-TELEGRAM_TOKEN = os.getenv("6221975594:AAFeG3Qo6rYwiRs95BT6WSP6PXlr6BjnHDA")
-OPENAI_KEY = os.getenv("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")
+TELEGRAM_TOKEN = os.getenv("6221975594:AAFeG3Qo6rYwiRs95BT6WSP6PXlr6BjnHDA"
 
 # رابط API الخاص بـ OpenAI
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
